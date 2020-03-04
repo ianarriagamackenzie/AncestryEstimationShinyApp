@@ -1,5 +1,7 @@
 # gnomAD Group Ancestry Estimation Shiny App
 
+[Hosted Shiny App](https://ianarrmack.shinyapps.io/AncestryEstimation-App/)
+
 ### Purpose
 Estimate the proportion of reference ancestry groups in summary genotype frequency data.
 
