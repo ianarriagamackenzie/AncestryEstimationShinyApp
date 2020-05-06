@@ -1,6 +1,7 @@
 # Hendricks Mixtures Research Group - UC Denver
 # ver 3
 # Created by Ian Arriaga MacKenzie
+# gnomad API work by Sam Chen
 # For use with gnomAD ancestry analysis information
 
 library(shiny)
@@ -14,6 +15,10 @@ library(gridExtra)
 library(dplyr)
 library(shinycssloaders)
 library(skimr)
+library(ghql)
+library(jsonlite)
+library(DT)
+
 
 # sets the colors used for the 5 ancestries, consistent coloring across different plots
 colvec = c(brewer.pal(n = 8, name = 'Set2')[3],
@@ -27,6 +32,16 @@ dat = read.csv('findat.txt', sep='')
 
 # load data from laptop for testing purposes, comment out on published app
 # dat = read.csv('~/GitHub/mixturesresearch/AncEstTestApp/findat.txt', sep='')
+
+con <- GraphqlClient$new(url="https://gnomad.broadinstitute.org/api/")
+qry <- Query$new()
+
+qry$query('findVariantIdRsId', 
+          'query get_variantId_from_rsId ($rsId: String!) {
+          searchResults(query: $rsId) {
+          label, url
+          }
+          }')
 
 # Functions
 
@@ -137,4 +152,113 @@ bbraninfo = function(dataset){
   names(sdat) = c('Ancestry', 'Mean', 'SD', 'P0', 'P25', 'P50', 'P75', 'P100')
   return(sdat)
   
+}
+
+
+#### 
+gnomadquery = function(rsid){
+  
+  variables <- list(rsId = rsid)
+  
+  res = con$exec(qry$queries$findVariantIdRsId, variables)
+  
+  tmp = jsonlite::fromJSON(res)
+  
+  variantId_name = unlist(strsplit(tmp$data$searchResults$label[1], ' '))[1]
+  
+  variables = list(varId = variantId_name)
+  
+  qry$query('getVariantPopAlleleCounts', 
+            'query getVariantPopAlleleCounts ($varId: String!) {
+            variant(dataset: gnomad_r2_1, variantId: $varId) {
+            rsid, chrom, pos, ref, alt, genome {
+            populations{
+            id, ac, an,
+            }
+            }
+            }
+            }')
+
+  res = con$exec(qry$queries$getVariantPopAlleleCounts, variables)
+  tmp = jsonlite::fromJSON(res)
+  
+  pops = c('AFR', 'NFE')
+  
+  allele_info = tmp$data$variant$genome$populations
+  ref = tmp$data$variant$ref
+  alt = tmp$data$variant$alt
+  
+  retval = data.frame('pop_name' = ' ',
+                      'AF' = rep(0, length(pops)),
+                      stringsAsFactors = FALSE)
+  
+  for (i in 1:length(pops)) {
+    tmp = allele_info[which(allele_info$id == pops[i]),]
+    retval[i,'pop_name'] = as.character(pops[i])
+    retval[i, 'AF'] = tmp$ac / tmp$an
+  }
+  
+  retval$vname = variantId_name; retval$ref = ref; retval$alt = alt
+  
+  return(retval)
+  }
+
+
+rsdfgen = function(sp, afrp, eurp){
+  
+  sigafr = 0.8404
+  sigeur = 0.1596
+  
+  ff = data.frame(rsid = character(),
+                  gnomadafr = numeric(),
+                  updateaf = numeric(),
+                  glink = character(),
+                  ref = character(),
+                  alt = character()
+  )
+  
+  for (n in 1:length(sp)){
+    
+    if (inherits(try(gnomadquery(sp[n]), silent = TRUE), "try-error")){
+      next()
+    } else {gqry = gnomadquery(sp[n])}
+    
+    AFR_AF = gqry %>% 
+      filter(pop_name == 'AFR') %>% 
+      select(AF) %>% 
+      as.numeric()
+    EUR_AF = gqry %>% 
+      filter(pop_name == 'NFE') %>% 
+      select(AF) %>% 
+      as.numeric()
+    
+    linkgen = gqry %>% 
+      select(vname) %>% 
+      slice(1:1) %>% 
+      as.character()
+    linkgen2 <- paste0("<a href='https://gnomad.broadinstitute.org/variant/",linkgen,"?dataset=gnomad_r2_1' target='_blank' class='btn btn-primary'>",sp[n],"</a>")
+    
+    refext = gqry %>% 
+      select(ref) %>% 
+      slice(1:1) %>% 
+      as.character()
+    altext = gqry %>% 
+      select(alt) %>% 
+      slice(1:1) %>% 
+      as.character()
+    
+    u_afr = (afrp / sigafr) * (AFR_AF - (EUR_AF * sigeur)) + (EUR_AF * eurp)
+    
+    tf = data.frame(rsid = sp[n],
+                    gnomadafr = AFR_AF,
+                    updateaf = u_afr,
+                    glink = linkgen2,
+                    ref = refext,
+                    alt = altext
+    )
+    
+    ff = rbind(ff, tf)
+  }
+  
+  return(ff)
 }

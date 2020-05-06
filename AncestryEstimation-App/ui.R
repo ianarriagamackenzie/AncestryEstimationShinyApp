@@ -6,8 +6,8 @@ ui = dashboardPage(
   # main header
   dashboardHeader(
     
-    title = 'gnomAD Ancestry Estimation',
-    titleWidth = 300
+    title = 'gnomAD Ancestry Estimation (BETA)',
+    titleWidth = 365
     
   ),
   
@@ -55,7 +55,7 @@ ui = dashboardPage(
     sidebarMenu(
       id = 'menuselect',
       
-      menuItem("Genome-wide Ancestry Proportions",
+      menuItem("Ancestry Proportions",
                icon = icon("chart-area"),
                startExpanded = TRUE,
                
@@ -70,7 +70,9 @@ ui = dashboardPage(
       ),
       
       # analysis by chromosome
-      menuItem("Ancestry Proportions by Chromosome", tabName = "chr", icon = icon("chart-bar")),
+      # menuItem("Ancestry Proportions by Chromosome", tabName = "chr", icon = icon("chart-bar")),
+      
+      menuItem("Ancestry Adjusted Allele Frequency", tabName = "adjaf", icon = icon("calculator")),
       
       # readme with disclaimer, acknowledgements, general use information
       menuItem("ReadMe", tabName = "readme", icon = icon("readme"))
@@ -302,6 +304,91 @@ ui = dashboardPage(
           
   ),
   
+  #ancestry adjusted function tab
+  tabItem(tabName = 'adjaf',
+          fluidRow(
+            
+            column(
+              width = 4,
+              
+              box(title = 'Ancestry Adjusted Allele Frequency', width = NULL, status = 'primary',
+                  'Using the ancestry proportions estimated in the gnomAD African/African American group, 
+                  we adjust the allele frequencies to match a user given target population at specific SNPs',
+                  br(),
+                  br(),
+                  'BETA: gnomAD v2.1.1. AFR group only at present.'
+                  ),
+              
+              box(title = "User Input", width = NULL, status = "primary",
+                  
+                  'List of rsIDs, comma delimited.',
+                  
+                  br(),
+                  br(),
+                  
+                  textAreaInput(
+                    inputId = "rsidsearch", label = NULL,
+                    placeholder = "rs4244285, rs3093024, rs744373, rs597668, ...",
+                    rows = 3,
+                    resize = 'none',
+                    width = "100%"
+                  ),
+                  
+                  'Ancestry proportions of a target admixed population.',
+                  
+                  br(),
+                  br(),
+                  
+                  splitLayout(
+                    numericInput("afrprop", 
+                                 'African', 
+                                 .650, 
+                                 min = 0, max = 1, step = .001),
+                    
+                    numericInput("eurprop",
+                                 'Non-Finnish European',
+                                 .350,
+                                 min = 0, max = 1, step = .001)
+                  ),
+                  
+                  textOutput('propec'),
+                  
+                  br(),
+                  
+                  actionBttn(
+                    inputId = "searchb",
+                    label = 'Search',
+                    style = 'jelly',
+                    color = "primary",
+                    icon = icon("search")
+                  ),
+                  
+                  br(),
+                  br(),
+                  
+                  'Querying gnomAD database may take several seconds.'
+                  
+                  
+              )
+            ),
+            
+            column(
+              width = 8,
+              
+              box(title = 'Allele Frequency Output Table', width = NULL, status = 'primary',
+              
+              # downloadLink('downloadData', 'Save Results'),
+              
+              withSpinner(DT::dataTableOutput('rsidout')),
+              tags$style(type="text/css", '#rsidout tfoot {display:none;}')
+              
+              )
+              
+            )
+          
+          )
+  ),
+  
   # readme page
   tabItem(tabName = "readme",
           fluidRow(
@@ -357,7 +444,7 @@ ui = dashboardPage(
                 strong("This work was a collaborative effort by:"),
                 br(), 
                 "Ian S. Arriaga Mackenzie, Gregory M. Matesi, Alexandria Ronco, Ryan Scherenberg, 
-                Andrew Zerwick, Yinfei Wu, James Vance, Sam Chen, Kaichao Chang, Jordan R. Hall, 
+                Andrew Zerwick, Yinfei Wu, James Vance, Sam Chen, Kaichao Chang, Katie Marker, Jordan R. Hall, 
                 Christopher R. Gignoux, Megan Null, Audrey E. Hendricks",
                 br(),
                 br(),
@@ -373,6 +460,8 @@ ui = dashboardPage(
                 br(),
                 'Ian S. Arriaga MacKenzie',
                 br(),
+                'IAN.ARRIAGAMACKENZIE@ucdenver.edu',
+                br(),
                 a(actionButton(inputId = "email1", label = NULL,
                                icon = icon("envelope", lib = "font-awesome")),
                   href="mailto:IAN.ARRIAGAMACKENZIE@ucdenver.edu"),
@@ -381,7 +470,9 @@ ui = dashboardPage(
                 # PI for project, Dr. Audrey Hendricks, contact information
                 strong('Principal Investigator'),
                 br(),
-                'Dr. Audrey E. Hendricks',
+                'Audrey E. Hendricks, Ph.D.',
+                br(),
+                'AUDREY.HENDRICKS@ucdenver.edu',
                 br(),
                 a(actionButton(inputId = "email2", label = NULL,
                                icon = icon("envelope", lib = "font-awesome")),
@@ -389,7 +480,7 @@ ui = dashboardPage(
               ),
               
               # CU Denver logo
-              img(src='CUdenverlogo.png', align = "Center", height = 150, width = 250)
+              img(src='CUdenverlogo.png', align = "Center", height = 150, width = 270)
             )
             
             )
